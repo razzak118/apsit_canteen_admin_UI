@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { acceptOrder, fetchOrdersByStatus, markOrderReady, rejectOrder } from '../api/admin';
+import { acceptOrder, fetchOrdersByStatus, fetchQueueStats, markOrderReady, rejectOrder } from '../api/admin';
 import StatusBadge from '../components/common/StatusBadge';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 
@@ -12,22 +12,40 @@ export default function OrdersPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [actionOrderId, setActionOrderId] = useState(null);
+  const [queueStats, setQueueStats] = useState(null);
 
-  const load = async (nextStatus = status, nextPage = page) => {
-    setLoading(true);
+  const load = async (nextStatus = status, nextPage = page, withLoader = true) => {
+    if (withLoader) setLoading(true);
     try {
       const data = await fetchOrdersByStatus(nextStatus, nextPage);
       setOrders(data.content || []);
       setPage(data.number || 0);
       setTotalPages(data.totalPages || 1);
+
+      try {
+        const queue = await fetchQueueStats();
+        setQueueStats(queue);
+      } catch {
+        setQueueStats(null);
+      }
     } finally {
-      setLoading(false);
+      if (withLoader) setLoading(false);
     }
   };
 
   useEffect(() => {
-    load(status, 0);
+    load(status, 0, true);
   }, [status]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      load(status, page, false);
+    }, 6000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [status, page]);
 
   const action = async (handler, orderId) => {
     setActionOrderId(orderId);
@@ -51,6 +69,15 @@ export default function OrdersPage() {
       </div>
 
       {loading && <LoadingSpinner label="Loading orders..." />}
+
+      {(status === 'PENDING' || status === 'IN_PROGRESS') && queueStats && (
+        <div className="queue-info-banner">
+          <strong>Queue:</strong> {queueStats.totalOrdersInQueue || 0} orders •
+          {' '}Pending: {queueStats.pendingOrders || 0} •
+          {' '}In Progress: {queueStats.inProgressOrders || 0} •
+          {' '}Est. Wait: {queueStats.estimatedWaitTime || 0} min
+        </div>
+      )}
 
       <div className="orders-grid">
         {orders.map((order) => (
@@ -94,9 +121,9 @@ export default function OrdersPage() {
       </div>
 
       <div className="row between top-12">
-        <button disabled={page <= 0} onClick={() => load(status, page - 1)}>Previous</button>
+        <button disabled={page <= 0} onClick={() => load(status, page - 1, true)}>Previous</button>
         <span>Page {page + 1} / {Math.max(totalPages, 1)}</span>
-        <button disabled={page >= totalPages - 1} onClick={() => load(status, page + 1)}>Next</button>
+        <button disabled={page >= totalPages - 1} onClick={() => load(status, page + 1, true)}>Next</button>
       </div>
     </div>
   );

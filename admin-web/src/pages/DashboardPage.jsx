@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
-import { fetchDeliveredTodayCount, fetchOrderCount } from '../api/admin';
+import { fetchDeliveredTodayCount, fetchOrderCount, fetchQueueStats } from '../api/admin';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 
 // Live pipeline statuses shown as stat cards (DELIVERED excluded — shown separately as "Today" via dedicated endpoint)
@@ -24,28 +24,54 @@ const BAR_COLORS = {
 export default function DashboardPage() {
   const [stats, setStats] = useState({});
   const [deliveredToday, setDeliveredToday] = useState(0);
+  const [queueStats, setQueueStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function load() {
-      setLoading(true);
-      try {
-        const countEntries = await Promise.all(
-          PIPELINE_STATUSES.map(async (status) => {
-            const value = await fetchOrderCount(status);
-            return [status, value];
-          })
-        );
-        setStats(Object.fromEntries(countEntries));
+    let isMounted = true;
 
-        // Uses GET /admin/orders/delivered/count — dedicated endpoint from AdminController
-        const today = await fetchDeliveredTodayCount();
-        setDeliveredToday(today);
+    async function load(isInitial = false) {
+      if (isInitial) setLoading(true);
+      try {
+        const [queueRes, pendingRes, inProgressRes, readyRes, cancelledRes, todayRes] = await Promise.allSettled([
+          fetchQueueStats(),
+          fetchOrderCount('PENDING'),
+          fetchOrderCount('IN_PROGRESS'),
+          fetchOrderCount('READY'),
+          fetchOrderCount('CANCELLED'),
+          fetchDeliveredTodayCount(),
+        ]);
+
+        if (!isMounted) return;
+
+        const queue = queueRes.status === 'fulfilled' ? queueRes.value : null;
+        const pendingCount = pendingRes.status === 'fulfilled' ? pendingRes.value : 0;
+        const inProgressCount = inProgressRes.status === 'fulfilled' ? inProgressRes.value : 0;
+        const readyCount = readyRes.status === 'fulfilled' ? readyRes.value : 0;
+        const cancelledCount = cancelledRes.status === 'fulfilled' ? cancelledRes.value : 0;
+        const today = todayRes.status === 'fulfilled' ? todayRes.value : 0;
+
+        setQueueStats(queue);
+        setStats({
+          PENDING: pendingCount,
+          IN_PROGRESS: inProgressCount,
+          READY: readyCount || 0,
+          CANCELLED: cancelledCount || 0,
+        });
+
+        setDeliveredToday(today || 0);
       } finally {
-        setLoading(false);
+        if (isMounted && isInitial) setLoading(false);
       }
     }
-    load();
+
+    load(true);
+    const interval = setInterval(() => load(false), 8000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, []);
 
   const chartData = [
@@ -86,6 +112,28 @@ export default function DashboardPage() {
           <strong>{deliveredToday}</strong>
         </div>
       </div>
+
+      {queueStats && (
+        <div className="card queue-stats-card">
+          <div className="row between">
+            <h3>Live Queue Metrics</h3>
+          </div>
+          <div className="stats-grid top-12">
+            <div className="stat-card">
+              <h4>Total In Queue</h4>
+              <strong>{queueStats.totalOrdersInQueue || 0}</strong>
+            </div>
+            <div className="stat-card">
+              <h4>Estimated Wait (min)</h4>
+              <strong>{queueStats.estimatedWaitTime || 0}</strong>
+            </div>
+            <div className="stat-card">
+              <h4>Active Staff</h4>
+              <strong>{queueStats.staffCount || 0}</strong>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="card chart-card">
         <h3>Order Pipeline Overview</h3>

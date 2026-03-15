@@ -10,6 +10,16 @@ export async function fetchDeliveredTodayCount() {
   return response.data;
 }
 
+export async function fetchQueueStats() {
+  const response = await api.get('/admin/orders/queue/stats');
+  return response.data;
+}
+
+export async function fetchOrderWaitTime(orderId) {
+  const response = await api.get(`/admin/orders/${orderId}/wait-time`);
+  return response.data;
+}
+
 export async function fetchOrdersByStatus(orderStatus, pageNo = 0) {
   const response = await api.get('/admin/orders', { params: { orderStatus, pageNo } });
   return response.data;

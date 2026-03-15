@@ -150,6 +150,16 @@ th, td { padding: 10px; border-bottom: 1px solid #edf0fb; text-align: left; }
   margin-top: 8px;
 }
 
+.queue-info-banner {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #d6e3ff;
+  background: #eef4ff;
+  color: #1e3a8a;
+  font-size: 14px;
+}
+
 .status {
   padding: 4px 8px;
   border-radius: 8px;
