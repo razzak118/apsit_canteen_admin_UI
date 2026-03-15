@@ -17,7 +17,7 @@ export default function ItemsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [category, setCategory] = useState('ALL');
   const [selected, setSelected] = useState([]);
-  const [form, setForm] = useState({ itemName: '', price: '', category: 'VEG', itemImage: null });
+  const [form, setForm] = useState({ itemName: '', price: '', category: 'VEG', itemImage: null, readyIn: 0 });
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -52,11 +52,12 @@ export default function ItemsPage() {
     fd.append('category', form.category);
     fd.append('itemImage', form.itemImage);
     fd.append('isAvailable', 'true');
+    fd.append('readyIn', form.readyIn);
 
     setSubmitting(true);
     try {
       await createItem(fd);
-      setForm({ itemName: '', price: '', category: 'VEG', itemImage: null });
+      setForm({ itemName: '', price: '', category: 'VEG', itemImage: null, readyIn: 0 });
       setMessage('Item created successfully');
       await load(0, category);
     } finally {
@@ -124,6 +125,16 @@ export default function ItemsPage() {
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
+          <div className="ready-in-field">
+            <label>Ready In (min)</label>
+            <input
+              type="number"
+              min="0"
+              placeholder="Prep time (0 = instant)"
+              value={form.readyIn}
+              onChange={(e) => setForm((s) => ({ ...s, readyIn: parseInt(e.target.value) || 0 }))}
+            />
+          </div>
           <input
             type="file"
             accept="image/*"
@@ -167,6 +178,7 @@ export default function ItemsPage() {
                 <th>Name</th>
                 <th>Category</th>
                 <th>Price</th>
+                <th>Ready In (min)</th>
                 <th>Availability</th>
                 <th>Actions</th>
               </tr>
@@ -185,6 +197,7 @@ export default function ItemsPage() {
                   <td>{item.itemName}</td>
                   <td>{item.category}</td>
                   <td>₹{item.price}</td>
+                  <td>{item.readyIn === 0 ? <span className="chip" style={{background:'#d5f9e1',color:'#136f3f',borderColor:'#b0f0c6'}}>Instant</span> : `${item.readyIn} min`}</td>
                   <td>{item.available ? 'Available' : item.isAvailable ? 'Available' : 'Unavailable'}</td>
                   <td className="row gap-8">
                     <button onClick={() => handleToggleAvailability(item.itemId)} disabled={actionLoading}>Toggle</button>

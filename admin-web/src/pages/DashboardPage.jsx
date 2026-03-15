@@ -1,10 +1,23 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
-import { fetchDeliveredTodayCount, fetchOrderCount, fetchQueueStats } from '../api/admin';
+import {
+  fetchDeliveredTodayCount,
+  fetchOrderCount,
+  fetchOrdersByStatus,
+  fetchQueueStats,
+  fetchTotalWaitTime,
+  getInstantReadyItems,
+  getItems,
+  getItemsByCategory,
+  getItemsByPriceRange,
+} from '../api/admin';
 import LoadingSpinner from '../components/common/LoadingSpinner';
+import StatusBadge from '../components/common/StatusBadge';
 
 // Live pipeline statuses shown as stat cards (DELIVERED excluded — shown separately as "Today" via dedicated endpoint)
 const PIPELINE_STATUSES = ['PENDING', 'IN_PROGRESS', 'READY', 'CANCELLED'];
+const MENU_CATEGORIES = ['VEG', 'BEVERAGE', 'SNACK', 'BREAKFAST'];
 
 const STATUS_LABELS = {
   PENDING: 'Pending',
@@ -25,21 +38,44 @@ export default function DashboardPage() {
   const [stats, setStats] = useState({});
   const [deliveredToday, setDeliveredToday] = useState(0);
   const [queueStats, setQueueStats] = useState(null);
+  const [totalWaitTime, setTotalWaitTime] = useState(0);
+  const [spotlightOrders, setSpotlightOrders] = useState([]);
+  const [itemInsights, setItemInsights] = useState({
+    totalItems: 0,
+    instantReady: 0,
+    budgetItems: 0,
+    categories: {},
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
 
-    async function load(isInitial = false) {
+    async function loadOrdersPanel(isInitial = false) {
       if (isInitial) setLoading(true);
       try {
-        const [queueRes, pendingRes, inProgressRes, readyRes, cancelledRes, todayRes] = await Promise.allSettled([
+        const [
+          queueRes,
+          pendingRes,
+          inProgressRes,
+          readyRes,
+          cancelledRes,
+          todayRes,
+          waitTimeRes,
+          pendingOrdersRes,
+          inProgressOrdersRes,
+          readyOrdersRes,
+        ] = await Promise.allSettled([
           fetchQueueStats(),
           fetchOrderCount('PENDING'),
           fetchOrderCount('IN_PROGRESS'),
           fetchOrderCount('READY'),
           fetchOrderCount('CANCELLED'),
           fetchDeliveredTodayCount(),
+          fetchTotalWaitTime(),
+          fetchOrdersByStatus('PENDING', 0),
+          fetchOrdersByStatus('IN_PROGRESS', 0),
+          fetchOrdersByStatus('READY', 0),
         ]);
 
         if (!isMounted) return;
@@ -50,14 +86,25 @@ export default function DashboardPage() {
         const readyCount = readyRes.status === 'fulfilled' ? readyRes.value : 0;
         const cancelledCount = cancelledRes.status === 'fulfilled' ? cancelledRes.value : 0;
         const today = todayRes.status === 'fulfilled' ? todayRes.value : 0;
+        const queueWait = waitTimeRes.status === 'fulfilled' ? waitTimeRes.value : 0;
+
+        const pendingOrders = pendingOrdersRes.status === 'fulfilled' ? (pendingOrdersRes.value?.content || []) : [];
+        const inProgressOrders = inProgressOrdersRes.status === 'fulfilled' ? (inProgressOrdersRes.value?.content || []) : [];
+        const readyOrders = readyOrdersRes.status === 'fulfilled' ? (readyOrdersRes.value?.content || []) : [];
 
         setQueueStats(queue);
+        setTotalWaitTime(queueWait || 0);
         setStats({
           PENDING: pendingCount,
           IN_PROGRESS: inProgressCount,
           READY: readyCount || 0,
           CANCELLED: cancelledCount || 0,
         });
+        setSpotlightOrders([
+          ...inProgressOrders.slice(0, 2),
+          ...pendingOrders.slice(0, 2),
+          ...readyOrders.slice(0, 2),
+        ].slice(0, 6));
 
         setDeliveredToday(today || 0);
       } finally {
@@ -65,12 +112,43 @@ export default function DashboardPage() {
       }
     }
 
-    load(true);
-    const interval = setInterval(() => load(false), 8000);
+    async function loadMenuPanel() {
+      const [allItemsRes, instantReadyRes, budgetRes, ...categoryResults] = await Promise.allSettled([
+        getItems(0),
+        getInstantReadyItems(),
+        getItemsByPriceRange(0, 100),
+        ...MENU_CATEGORIES.map((category) => getItemsByCategory(category, 0)),
+      ]);
+
+      if (!isMounted) return;
+
+      const categories = {};
+      MENU_CATEGORIES.forEach((category, idx) => {
+        const result = categoryResults[idx];
+        categories[category] = result.status === 'fulfilled'
+          ? (result.value?.totalElements ?? (result.value?.content || []).length)
+          : 0;
+      });
+
+      setItemInsights({
+        totalItems: allItemsRes.status === 'fulfilled'
+          ? (allItemsRes.value?.totalElements ?? (allItemsRes.value?.content || []).length)
+          : 0,
+        instantReady: instantReadyRes.status === 'fulfilled' ? (instantReadyRes.value || []).length : 0,
+        budgetItems: budgetRes.status === 'fulfilled' ? (budgetRes.value || []).length : 0,
+        categories,
+      });
+    }
+
+    loadOrdersPanel(true);
+    loadMenuPanel();
+    const ordersInterval = setInterval(() => loadOrdersPanel(false), 8000);
+    const menuInterval = setInterval(() => loadMenuPanel(), 30000);
 
     return () => {
       isMounted = false;
-      clearInterval(interval);
+      clearInterval(ordersInterval);
+      clearInterval(menuInterval);
     };
   }, []);
 
@@ -113,27 +191,87 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {queueStats && (
-        <div className="card queue-stats-card">
+      <div className="dashboard-grid-2">
+        {queueStats && (
+          <div className="card queue-stats-card">
+            <div className="row between">
+              <h3>Live Queue Metrics</h3>
+              <Link to="/orders" className="inline-link">Open orders</Link>
+            </div>
+            <div className="stats-grid top-12">
+              <div className="stat-card">
+                <h4>Total In Queue</h4>
+                <strong>{queueStats.totalOrdersInQueue || 0}</strong>
+              </div>
+              <div className="stat-card">
+                <h4>Parallel Wait (min)</h4>
+                <strong>{queueStats.estimatedWaitTime || 0}</strong>
+              </div>
+              <div className="stat-card">
+                <h4>Linear Wait (min)</h4>
+                <strong>{totalWaitTime || 0}</strong>
+              </div>
+              <div className="stat-card">
+                <h4>Active Staff</h4>
+                <strong>{queueStats.staffCount || 0}</strong>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="card">
           <div className="row between">
-            <h3>Live Queue Metrics</h3>
+            <h3>Menu Intelligence</h3>
+            <Link to="/items" className="inline-link">Open items</Link>
           </div>
           <div className="stats-grid top-12">
             <div className="stat-card">
-              <h4>Total In Queue</h4>
-              <strong>{queueStats.totalOrdersInQueue || 0}</strong>
+              <h4>Total Menu Items</h4>
+              <strong>{itemInsights.totalItems}</strong>
             </div>
             <div className="stat-card">
-              <h4>Estimated Wait (min)</h4>
-              <strong>{queueStats.estimatedWaitTime || 0}</strong>
+              <h4>Instant Ready Items</h4>
+              <strong>{itemInsights.instantReady}</strong>
             </div>
             <div className="stat-card">
-              <h4>Active Staff</h4>
-              <strong>{queueStats.staffCount || 0}</strong>
+              <h4>Budget Items (₹0-₹100)</h4>
+              <strong>{itemInsights.budgetItems}</strong>
             </div>
           </div>
+
+          <div className="category-chips top-12">
+            {MENU_CATEGORIES.map((category) => (
+              <span key={category} className="chip">
+                {category}: {itemInsights.categories?.[category] || 0}
+              </span>
+            ))}
+          </div>
         </div>
-      )}
+      </div>
+
+      <div className="card">
+        <div className="row between">
+          <h3>Orders Needing Attention</h3>
+          <Link to="/orders" className="inline-link">Manage</Link>
+        </div>
+        {spotlightOrders.length === 0 ? (
+          <p className="top-12">No active orders right now.</p>
+        ) : (
+          <div className="attention-grid top-12">
+            {spotlightOrders.map((order) => (
+              <div key={order.id} className="attention-card">
+                <div className="row between">
+                  <strong>#{order.id}</strong>
+                  <StatusBadge status={order.orderStatus} />
+                </div>
+                <p>{order.username}</p>
+                <p>₹{order.totalAmount}</p>
+                <p>Prep: {order.estPrepTime || 0} min</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       <div className="card chart-card">
         <h3>Order Pipeline Overview</h3>

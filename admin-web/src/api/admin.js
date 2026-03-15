@@ -55,6 +55,21 @@ export async function getItemsByCategory(categoryName, pageNo = 0) {
   return response.data;
 }
 
+export async function getItemsByPriceRange(minPrice, highPrice) {
+  const response = await api.get('/item/price-range', { params: { minPrice, highPrice } });
+  return response.data;
+}
+
+export async function getInstantReadyItems() {
+  const response = await api.get('/item/instant-ready');
+  return response.data;
+}
+
+export async function fetchTotalWaitTime() {
+  const response = await api.get('/order/wait-time');
+  return response.data;
+}
+
 export async function createItem(formData) {
   const response = await api.post('/admin/item/save', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },

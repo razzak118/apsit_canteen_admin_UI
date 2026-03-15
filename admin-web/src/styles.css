@@ -99,11 +99,28 @@ body { margin: 0; }
 .grid { display: grid; }
 .gap-16 { gap: 16px; }
 
+.dashboard-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 16px;
+}
+
 .row { display: flex; align-items: center; }
 .between { justify-content: space-between; }
 .gap-8 { gap: 8px; }
 .top-12 { margin-top: 12px; }
 .narrow { max-width: 560px; }
+
+.inline-link {
+  color: #3357e8;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.inline-link:hover {
+  text-decoration: underline;
+}
 
 .grid-form {
   display: grid;
@@ -158,6 +175,53 @@ th, td { padding: 10px; border-bottom: 1px solid #edf0fb; text-align: left; }
   background: #eef4ff;
   color: #1e3a8a;
   font-size: 14px;
+}
+
+.category-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  background: #eef3ff;
+  border: 1px solid #d8e2ff;
+  color: #2a3f86;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.attention-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+}
+
+.attention-card {
+  border: 1px solid #e4eafe;
+  border-radius: 12px;
+  padding: 10px;
+  background: #fbfcff;
+}
+
+.ready-in-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ready-in-field label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #59607a;
+}
+
+.attention-card p {
+  margin: 6px 0 0;
+  color: #4f5a7f;
+  font-size: 13px;
 }
 
 .status {
