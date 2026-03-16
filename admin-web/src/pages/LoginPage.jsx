@@ -27,7 +27,7 @@ export default function LoginPage() {
     <div className="auth-page">
       <form className="auth-card" onSubmit={onSubmit}>
         <h2>Admin Login</h2>
-        <p>Uses /auth/login + /auth/refresh-jwt flow</p>
+        <p>Uses /auth/admin-login flow</p>
         <input
           placeholder="Username"
           value={form.username}

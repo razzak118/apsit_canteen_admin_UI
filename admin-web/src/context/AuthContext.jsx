@@ -5,6 +5,17 @@ import { decodeJwt } from '../lib/jwt';
 
 const AuthContext = createContext(null);
 
+function buildAdminProfile(token, fallbackUserId) {
+  const payload = decodeJwt(token);
+  if (!payload) return null;
+
+  return {
+    userId: Number(payload.userId || fallbackUserId || 0),
+    username: payload.sub || 'Admin',
+    role: payload.role,
+  };
+}
+
 export function AuthProvider({ children }) {
   const [auth, setAuth] = useState(() => authStorage.get());
   const [profile, setProfile] = useState(null);
@@ -20,7 +31,14 @@ export function AuthProvider({ children }) {
         setLoading(false);
         return;
       }
+
+      const tokenRole = decodeJwt(auth.jwt)?.role;
       try {
+        if (tokenRole === 'ADMIN') {
+          if (mounted) setProfile(buildAdminProfile(auth.jwt, auth.userId));
+          return;
+        }
+
         const user = await getCurrentUser();
         if (mounted) setProfile(user);
       } catch {
@@ -42,6 +60,12 @@ export function AuthProvider({ children }) {
 
   const login = async ({ username, password }) => {
     const data = await adminLogin({ username, password });
+    const tokenRole = decodeJwt(data.jwt)?.role;
+    if (tokenRole !== 'ADMIN') {
+      logout();
+      throw new Error('Only ADMIN role can access this panel.');
+    }
+
     const nextAuth = {
       jwt: data.jwt,
       refreshToken: data.refreshToken,
@@ -49,16 +73,10 @@ export function AuthProvider({ children }) {
     };
     saveAuth(nextAuth);
 
-    const user = await getCurrentUser();
-    setProfile(user);
+    const adminProfile = buildAdminProfile(data.jwt, data.userId);
+    setProfile(adminProfile);
 
-    const tokenRole = decodeJwt(data.jwt)?.role;
-    if (tokenRole !== 'ADMIN') {
-      logout();
-      throw new Error('Only ADMIN role can access this panel.');
-    }
-
-    return user;
+    return adminProfile;
   };
 
   const signupAdmin = async ({ username, password, mobileNumber }) => {
