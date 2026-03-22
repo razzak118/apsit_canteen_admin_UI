@@ -52,6 +52,38 @@ export default function DashboardPage() {
   useEffect(() => {
     let isMounted = true;
 
+    async function refreshLiveStatsOnly() {
+      const [queueRes, pendingRes, inProgressRes, readyRes, cancelledRes, todayRes, waitTimeRes] = await Promise.allSettled([
+        fetchQueueStats(),
+        fetchOrderCount('PENDING'),
+        fetchOrderCount('IN_PROGRESS'),
+        fetchOrderCount('READY'),
+        fetchOrderCount('CANCELLED'),
+        fetchDeliveredTodayCount(),
+        fetchTotalWaitTime(),
+      ]);
+
+      if (!isMounted) return;
+
+      const queue = queueRes.status === 'fulfilled' ? queueRes.value : null;
+      const pendingCount = pendingRes.status === 'fulfilled' ? pendingRes.value : 0;
+      const inProgressCount = inProgressRes.status === 'fulfilled' ? inProgressRes.value : 0;
+      const readyCount = readyRes.status === 'fulfilled' ? readyRes.value : 0;
+      const cancelledCount = cancelledRes.status === 'fulfilled' ? cancelledRes.value : 0;
+      const today = todayRes.status === 'fulfilled' ? todayRes.value : 0;
+      const queueWait = waitTimeRes.status === 'fulfilled' ? waitTimeRes.value : 0;
+
+      setQueueStats(queue);
+      setTotalWaitTime(queueWait || 0);
+      setStats({
+        PENDING: pendingCount,
+        IN_PROGRESS: inProgressCount,
+        READY: readyCount,
+        CANCELLED: cancelledCount,
+      });
+      setDeliveredToday(today || 0);
+    }
+
     async function loadOrdersPanel(isInitial = false) {
       if (isInitial) setLoading(true);
       try {
@@ -146,7 +178,7 @@ export default function DashboardPage() {
     const ordersInterval = setInterval(() => loadOrdersPanel(false), 8000);
     const menuInterval = setInterval(() => loadMenuPanel(), 30000);
     const unsubscribe = subscribeToAdminOrderEvents(() => {
-      loadOrdersPanel(false);
+      refreshLiveStatsOnly();
     });
 
     return () => {
