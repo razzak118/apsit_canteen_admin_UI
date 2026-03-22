@@ -1,4 +1,4 @@
-import { LayoutDashboard, Package, ClipboardList, ScanLine, LogOut } from 'lucide-react';
+import { LayoutDashboard, Package, ClipboardList, ScanLine, UserRoundCog, LogOut } from 'lucide-react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
@@ -7,6 +7,7 @@ const navItems = [
   { to: '/items', label: 'Items', icon: Package },
   { to: '/orders', label: 'Orders', icon: ClipboardList },
   { to: '/claim', label: 'Claim Order', icon: ScanLine },
+  { to: '/profile', label: 'Profile', icon: UserRoundCog },
 ];
 
 export default function AdminLayout() {

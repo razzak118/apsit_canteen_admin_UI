@@ -91,3 +91,28 @@ export async function deleteItemsBulk(itemIds) {
   const response = await api.post('/admin/item/delete-all', itemIds);
   return response.data;
 }
+
+export async function updateAdminProfile(payload) {
+  const response = await api.post('/admin/profile/update', payload);
+  return response.data;
+}
+
+export async function fetchAdminProfile() {
+  const response = await api.get('/admin/profile');
+  return response.data;
+}
+
+export async function changeAdminPassword(payload) {
+  const response = await api.post('/admin/profile/change-pass', payload);
+  return response.data;
+}
+
+export async function toggleAdminDutyStatus() {
+  const response = await api.post('/admin/profile/toggle-duty-status');
+  return response.data;
+}
+
+export async function fetchCanteenOpenStatus() {
+  const response = await api.get('/admin/profile/is-canteen-open');
+  return response.data;
+}

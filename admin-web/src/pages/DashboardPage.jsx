@@ -14,6 +14,7 @@ import {
 } from '../api/admin';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import StatusBadge from '../components/common/StatusBadge';
+import { subscribeToAdminOrderEvents } from '../lib/adminRealtime';
 
 // Live pipeline statuses shown as stat cards (DELIVERED excluded — shown separately as "Today" via dedicated endpoint)
 const PIPELINE_STATUSES = ['PENDING', 'IN_PROGRESS', 'READY', 'CANCELLED'];
@@ -144,11 +145,15 @@ export default function DashboardPage() {
     loadMenuPanel();
     const ordersInterval = setInterval(() => loadOrdersPanel(false), 8000);
     const menuInterval = setInterval(() => loadMenuPanel(), 30000);
+    const unsubscribe = subscribeToAdminOrderEvents(() => {
+      loadOrdersPanel(false);
+    });
 
     return () => {
       isMounted = false;
       clearInterval(ordersInterval);
       clearInterval(menuInterval);
+      unsubscribe();
     };
   }, []);
 

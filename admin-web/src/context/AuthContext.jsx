@@ -89,6 +89,10 @@ export function AuthProvider({ children }) {
     authStorage.clear();
   };
 
+  const updateProfile = (partialProfile) => {
+    setProfile((prev) => ({ ...(prev || {}), ...(partialProfile || {}) }));
+  };
+
   const value = useMemo(
     () => ({
       auth,
@@ -98,6 +102,7 @@ export function AuthProvider({ children }) {
       loading,
       login,
       signupAdmin,
+      updateProfile,
       logout,
     }),
     [auth, isAdmin, profile, loading]

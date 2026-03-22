@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { acceptOrder, fetchOrdersByStatus, fetchQueueStats, markOrderReady, rejectOrder } from '../api/admin';
 import StatusBadge from '../components/common/StatusBadge';
 import LoadingSpinner from '../components/common/LoadingSpinner';
+import { subscribeToAdminOrderEvents } from '../lib/adminRealtime';
 
 const statuses = ['PENDING', 'IN_PROGRESS', 'READY', 'DELIVERED', 'CANCELLED'];
 
@@ -42,8 +43,13 @@ export default function OrdersPage() {
       load(status, page, false);
     }, 6000);
 
+    const unsubscribe = subscribeToAdminOrderEvents(() => {
+      load(status, page, false);
+    });
+
     return () => {
       clearInterval(interval);
+      unsubscribe();
     };
   }, [status, page]);
 
