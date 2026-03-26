@@ -2,12 +2,19 @@ import { authStorage } from './storage';
 
 function resolveWsBaseUrl() {
   const apiBase = import.meta.env.VITE_API_BASE_URL || 'https://apsit-canteen.onrender.com/api/v1';
-  return apiBase.replace(/\/api\/v\d+(?:\/)?$/i, '').replace(/\/$/, '');
+  return apiBase.replace(/\/$/, '');
 }
 
 export function subscribeToAdminOrderEvents(onMessage) {
   const auth = authStorage.get();
   if (!auth?.jwt) {
+    return () => {};
+  }
+
+  // Disable WebSocket in development to avoid backend CORS 403 on /ws/info
+  // Polling fallback is active and sufficient for development
+  const isProduction = import.meta.env.PROD;
+  if (!isProduction) {
     return () => {};
   }
 

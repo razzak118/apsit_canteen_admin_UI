@@ -5,8 +5,6 @@ import {
   fetchDeliveredTodayCount,
   fetchOrderCount,
   fetchOrdersByStatus,
-  fetchQueueStats,
-  fetchTotalWaitTime,
   getInstantReadyItems,
   getItems,
   getItemsByCategory,
@@ -39,7 +37,6 @@ export default function DashboardPage() {
   const [stats, setStats] = useState({});
   const [deliveredToday, setDeliveredToday] = useState(0);
   const [queueStats, setQueueStats] = useState(null);
-  const [totalWaitTime, setTotalWaitTime] = useState(0);
   const [spotlightOrders, setSpotlightOrders] = useState([]);
   const [itemInsights, setItemInsights] = useState({
     totalItems: 0,
@@ -53,28 +50,27 @@ export default function DashboardPage() {
     let isMounted = true;
 
     async function refreshLiveStatsOnly() {
-      const [queueRes, pendingRes, inProgressRes, readyRes, cancelledRes, todayRes, waitTimeRes] = await Promise.allSettled([
-        fetchQueueStats(),
+      const [pendingRes, inProgressRes, readyRes, cancelledRes, todayRes] = await Promise.allSettled([
         fetchOrderCount('PENDING'),
         fetchOrderCount('IN_PROGRESS'),
         fetchOrderCount('READY'),
         fetchOrderCount('CANCELLED'),
         fetchDeliveredTodayCount(),
-        fetchTotalWaitTime(),
       ]);
 
       if (!isMounted) return;
 
-      const queue = queueRes.status === 'fulfilled' ? queueRes.value : null;
       const pendingCount = pendingRes.status === 'fulfilled' ? pendingRes.value : 0;
       const inProgressCount = inProgressRes.status === 'fulfilled' ? inProgressRes.value : 0;
       const readyCount = readyRes.status === 'fulfilled' ? readyRes.value : 0;
       const cancelledCount = cancelledRes.status === 'fulfilled' ? cancelledRes.value : 0;
       const today = todayRes.status === 'fulfilled' ? todayRes.value : 0;
-      const queueWait = waitTimeRes.status === 'fulfilled' ? waitTimeRes.value : 0;
 
-      setQueueStats(queue);
-      setTotalWaitTime(queueWait || 0);
+      setQueueStats({
+        totalOrdersInQueue: pendingCount + inProgressCount,
+        pendingOrders: pendingCount,
+        inProgressOrders: inProgressCount,
+      });
       setStats({
         PENDING: pendingCount,
         IN_PROGRESS: inProgressCount,
@@ -88,24 +84,20 @@ export default function DashboardPage() {
       if (isInitial) setLoading(true);
       try {
         const [
-          queueRes,
           pendingRes,
           inProgressRes,
           readyRes,
           cancelledRes,
           todayRes,
-          waitTimeRes,
           pendingOrdersRes,
           inProgressOrdersRes,
           readyOrdersRes,
         ] = await Promise.allSettled([
-          fetchQueueStats(),
           fetchOrderCount('PENDING'),
           fetchOrderCount('IN_PROGRESS'),
           fetchOrderCount('READY'),
           fetchOrderCount('CANCELLED'),
           fetchDeliveredTodayCount(),
-          fetchTotalWaitTime(),
           fetchOrdersByStatus('PENDING', 0),
           fetchOrdersByStatus('IN_PROGRESS', 0),
           fetchOrdersByStatus('READY', 0),
@@ -113,20 +105,21 @@ export default function DashboardPage() {
 
         if (!isMounted) return;
 
-        const queue = queueRes.status === 'fulfilled' ? queueRes.value : null;
         const pendingCount = pendingRes.status === 'fulfilled' ? pendingRes.value : 0;
         const inProgressCount = inProgressRes.status === 'fulfilled' ? inProgressRes.value : 0;
         const readyCount = readyRes.status === 'fulfilled' ? readyRes.value : 0;
         const cancelledCount = cancelledRes.status === 'fulfilled' ? cancelledRes.value : 0;
         const today = todayRes.status === 'fulfilled' ? todayRes.value : 0;
-        const queueWait = waitTimeRes.status === 'fulfilled' ? waitTimeRes.value : 0;
 
         const pendingOrders = pendingOrdersRes.status === 'fulfilled' ? (pendingOrdersRes.value?.content || []) : [];
         const inProgressOrders = inProgressOrdersRes.status === 'fulfilled' ? (inProgressOrdersRes.value?.content || []) : [];
         const readyOrders = readyOrdersRes.status === 'fulfilled' ? (readyOrdersRes.value?.content || []) : [];
 
-        setQueueStats(queue);
-        setTotalWaitTime(queueWait || 0);
+        setQueueStats({
+          totalOrdersInQueue: pendingCount + inProgressCount,
+          pendingOrders: pendingCount,
+          inProgressOrders: inProgressCount,
+        });
         setStats({
           PENDING: pendingCount,
           IN_PROGRESS: inProgressCount,
@@ -241,16 +234,12 @@ export default function DashboardPage() {
                 <strong>{queueStats.totalOrdersInQueue || 0}</strong>
               </div>
               <div className="stat-card">
-                <h4>Parallel Wait (min)</h4>
-                <strong>{queueStats.estimatedWaitTime || 0}</strong>
+                <h4>Queue Coverage</h4>
+                <strong>Pending + In Progress</strong>
               </div>
               <div className="stat-card">
-                <h4>Linear Wait (min)</h4>
-                <strong>{totalWaitTime || 0}</strong>
-              </div>
-              <div className="stat-card">
-                <h4>Active Staff</h4>
-                <strong>{queueStats.staffCount || 0}</strong>
+                <h4>Realtime</h4>
+                <strong>WebSocket + Polling</strong>
               </div>
             </div>
           </div>

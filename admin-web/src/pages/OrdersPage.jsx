@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { acceptOrder, fetchOrdersByStatus, fetchQueueStats, markOrderReady, rejectOrder } from '../api/admin';
+import { acceptOrder, fetchOrderCount, fetchOrdersByStatus, markOrderReady, rejectOrder } from '../api/admin';
 import StatusBadge from '../components/common/StatusBadge';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { subscribeToAdminOrderEvents } from '../lib/adminRealtime';
@@ -24,8 +24,15 @@ export default function OrdersPage() {
       setTotalPages(data.totalPages || 1);
 
       try {
-        const queue = await fetchQueueStats();
-        setQueueStats(queue);
+        const [pendingCount, inProgressCount] = await Promise.all([
+          fetchOrderCount('PENDING'),
+          fetchOrderCount('IN_PROGRESS'),
+        ]);
+        setQueueStats({
+          totalOrdersInQueue: (pendingCount || 0) + (inProgressCount || 0),
+          pendingOrders: pendingCount || 0,
+          inProgressOrders: inProgressCount || 0,
+        });
       } catch {
         setQueueStats(null);
       }
