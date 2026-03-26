@@ -49,6 +49,39 @@ export default function DashboardPage() {
   useEffect(() => {
     let isMounted = true;
 
+    async function refreshLiveStatsOnly() {
+      const [pendingRes, inProgressRes, readyRes, cancelledRes, todayRes] = await Promise.allSettled([
+        fetchOrderCount('PENDING'),
+        fetchOrderCount('IN_PROGRESS'),
+        fetchOrderCount('READY'),
+        fetchOrderCount('CANCELLED'),
+        fetchDeliveredTodayCount(),
+      ]);
+
+      if (!isMounted) return;
+
+      const pendingCount = pendingRes.status === 'fulfilled' ? pendingRes.value : 0;
+      const inProgressCount = inProgressRes.status === 'fulfilled' ? inProgressRes.value : 0;
+      const readyCount = readyRes.status === 'fulfilled' ? readyRes.value : 0;
+      const cancelledCount = cancelledRes.status === 'fulfilled' ? cancelledRes.value : 0;
+      const today = todayRes.status === 'fulfilled' ? todayRes.value : 0;
+
+      setQueueStats({
+        totalOrdersInQueue: pendingCount + inProgressCount,
+        pendingOrders: pendingCount,
+        inProgressOrders: inProgressCount,
+      });
+
+      setStats({
+        PENDING: pendingCount,
+        IN_PROGRESS: inProgressCount,
+        READY: readyCount,
+        CANCELLED: cancelledCount,
+      });
+
+      setDeliveredToday(today || 0);
+    }
+
     async function loadOrdersPanel(isInitial = false) {
       if (isInitial) setLoading(true);
       try {
@@ -137,8 +170,21 @@ export default function DashboardPage() {
 
     loadOrdersPanel(true);
     loadMenuPanel();
-    const unsubscribe = subscribeToAdminOrderEvents(() => {
-      loadOrdersPanel(false);
+    const unsubscribe = subscribeToAdminOrderEvents((payload) => {
+      if (payload?.orderStatus === 'PENDING') {
+        setStats((prev) => ({
+          ...prev,
+          PENDING: (prev.PENDING || 0) + 1,
+        }));
+        setQueueStats((prev) => ({
+          totalOrdersInQueue: (prev?.totalOrdersInQueue || 0) + 1,
+          pendingOrders: (prev?.pendingOrders || 0) + 1,
+          inProgressOrders: prev?.inProgressOrders || 0,
+        }));
+        setSpotlightOrders((prev) => [payload, ...prev].slice(0, 6));
+      }
+
+      refreshLiveStatsOnly();
     });
 
     return () => {
