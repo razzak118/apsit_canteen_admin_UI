@@ -49,37 +49,6 @@ export default function DashboardPage() {
   useEffect(() => {
     let isMounted = true;
 
-    async function refreshLiveStatsOnly() {
-      const [pendingRes, inProgressRes, readyRes, cancelledRes, todayRes] = await Promise.allSettled([
-        fetchOrderCount('PENDING'),
-        fetchOrderCount('IN_PROGRESS'),
-        fetchOrderCount('READY'),
-        fetchOrderCount('CANCELLED'),
-        fetchDeliveredTodayCount(),
-      ]);
-
-      if (!isMounted) return;
-
-      const pendingCount = pendingRes.status === 'fulfilled' ? pendingRes.value : 0;
-      const inProgressCount = inProgressRes.status === 'fulfilled' ? inProgressRes.value : 0;
-      const readyCount = readyRes.status === 'fulfilled' ? readyRes.value : 0;
-      const cancelledCount = cancelledRes.status === 'fulfilled' ? cancelledRes.value : 0;
-      const today = todayRes.status === 'fulfilled' ? todayRes.value : 0;
-
-      setQueueStats({
-        totalOrdersInQueue: pendingCount + inProgressCount,
-        pendingOrders: pendingCount,
-        inProgressOrders: inProgressCount,
-      });
-      setStats({
-        PENDING: pendingCount,
-        IN_PROGRESS: inProgressCount,
-        READY: readyCount,
-        CANCELLED: cancelledCount,
-      });
-      setDeliveredToday(today || 0);
-    }
-
     async function loadOrdersPanel(isInitial = false) {
       if (isInitial) setLoading(true);
       try {
@@ -168,16 +137,12 @@ export default function DashboardPage() {
 
     loadOrdersPanel(true);
     loadMenuPanel();
-    const ordersInterval = setInterval(() => loadOrdersPanel(false), 8000);
-    const menuInterval = setInterval(() => loadMenuPanel(), 30000);
     const unsubscribe = subscribeToAdminOrderEvents(() => {
-      refreshLiveStatsOnly();
+      loadOrdersPanel(false);
     });
 
     return () => {
       isMounted = false;
-      clearInterval(ordersInterval);
-      clearInterval(menuInterval);
       unsubscribe();
     };
   }, []);
@@ -239,7 +204,7 @@ export default function DashboardPage() {
               </div>
               <div className="stat-card">
                 <h4>Realtime</h4>
-                <strong>WebSocket + Polling</strong>
+                <strong>WebSocket</strong>
               </div>
             </div>
           </div>

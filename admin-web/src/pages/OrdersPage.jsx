@@ -46,16 +46,11 @@ export default function OrdersPage() {
   }, [status]);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      load(status, page, false);
-    }, 6000);
-
     const unsubscribe = subscribeToAdminOrderEvents(() => {
       load(status, page, false);
     });
 
     return () => {
-      clearInterval(interval);
       unsubscribe();
     };
   }, [status, page]);

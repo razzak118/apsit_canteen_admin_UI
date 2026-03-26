@@ -11,13 +11,6 @@ export function subscribeToAdminOrderEvents(onMessage) {
     return () => {};
   }
 
-  // Disable WebSocket in development to avoid backend CORS 403 on /ws/info
-  // Polling fallback is active and sufficient for development
-  const isProduction = import.meta.env.PROD;
-  if (!isProduction) {
-    return () => {};
-  }
-
   let client = null;
   let isUnmounted = false;
 
@@ -53,13 +46,12 @@ export function subscribeToAdminOrderEvents(onMessage) {
       };
 
       client.onStompError = () => {
-        // Keep UI alive; polling fallback remains active.
+        // Keep UI alive if broker returns a STOMP error frame.
       };
 
       client.activate();
     } catch {
       // Fail silently to avoid breaking the whole page.
-      // Polling already updates orders/dashboard periodically.
     }
   })();
 
